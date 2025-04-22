@@ -1,0 +1,15 @@
+[project]
+name = "vzd"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "gymnasium[other]==1.0.0",
+    "numpy>=2.2.4",
+    "opencv-python>=4.11.0.86",
+    "rllte-core>=1.0.1",
+    "stable-baselines3[extra]>=2.6.0",
+    "torch>=2.6.0",
+    "vizdoom>=1.2.4",
+]
