@@ -1,3 +1,4 @@
+from typing import List
 from vizdoom import *
 
 import os
@@ -13,6 +14,7 @@ from rllte.xplore.reward import RND, E3B
 
 import gymnasium as gym
 from gymnasium import Env
+from gymnasium.wrappers import RecordVideo
 from gymnasium.utils.play import play as playing
 from gymnasium.spaces import Discrete, Box, Sequence
 
@@ -26,6 +28,15 @@ from stable_baselines3.common.evaluation import evaluate_policy
 
 CHECKPOINT_DIR = "./train/health_gathering"
 LOG_DIR = "./logs/log_health_gathering"
+# MODEL_NAME = f"./train/health_gathering_2_2048_grayscale_161x161/best_model_1370000"
+# MODEL_NAME = f"./train/health_gathering_3_4096_grayscale_161x161/best_model_970000"
+# MODEL_NAME = f"./train/health_gathering_4_4096_grayscale_101x101/best_model_820000"
+# MODEL_NAME = f"./train/health_gathering_6_4096_grayscale_161x161_glaucoma50/best_model_1220000"
+# MODEL_NAME = f"./train/health_gathering_7_4096_grayscale_161x161_glaucoma150/best_model_390000"
+# MODEL_NAME = f"./train/health_gathering_8_4096_grayscale_161x161_glaucoma100/best_model_300000"
+# MODEL_NAME = f"./train/health_gathering_9_4096_grayscale_161x161_glaucoma200/best_model_580000"
+MODEL_NAME = f"./train/health_gathering_10_4096_grayscale_161x161_glaucoma250/best_model_1030000"
+
 
 class VizDoomGym(Env):
     metadata = { "render_modes": ["human", "rgb_array"], "render_fps": 30 }
@@ -72,7 +83,7 @@ class VizDoomGym(Env):
         done = self.game.is_episode_finished()
         
         return img, reward, done, False, info
-    
+
     def render(self):
         state = self.game.get_state()
         if state:
@@ -102,6 +113,27 @@ class ImageTransformationWrapper(gym.ObservationWrapper):
         state = np.reshape(resize, (1, self.resized_shape[0], self.resized_shape[1]))
         return state
 
+class RenderWrapper(gym.Wrapper):
+    def __init__(self, env:gym.Env):
+        self.env = env
+        super(RenderWrapper, self).__init__(env)
+
+    def reset(self, seed=None, options=None):
+        observation, info = self.env.reset()
+        self.last_observation = observation
+        return observation, info
+
+    def step(self, action):
+        observation, reward, terminated, truncated, info = self.env.step(action)
+        self.last_observation = observation 
+        return observation, reward, terminated, truncated, info
+
+    def render(self):
+        to_render = np.moveaxis(self.last_observation, 0, -1)
+        if to_render.shape[-1] == 1:
+            to_render = np.repeat(to_render, 3, axis=2)
+        return to_render
+
 class GlaucomaWrapper(gym.Wrapper):
     def __init__(self, env:gym.Env, steps_with_hungry_to_glaucoma:int, steps_glaucoma_level:int, 
                  blidness_reward:float):
@@ -129,7 +161,6 @@ class GlaucomaWrapper(gym.Wrapper):
 
         self.last_medkits = 0
 
-    
     def reset(self, seed=None, options=None):
         self.blind = False
         self.steps_with_hungry = 0
@@ -258,13 +289,17 @@ class TrainAndLoggingCallback(BaseCallback):
 
 def make_env(render_mode=None):
     env = VizDoomGym(render_mode=render_mode)
-    # env = ImageTransformationWrapper(env, (161, 161))
-    # env = GlaucomaWrapper(env, 0, 150, -100)
+    env = ImageTransformationWrapper(env, (161, 161))
+    env = GlaucomaWrapper(env, 0, 250, -100)
+    if render_mode == "rgb_array":
+        env = RenderWrapper(env)
+        env = RecordVideo(env, video_folder="./videos", episode_trigger=lambda x: True)
     return env
+
 
 def play():
     env = make_env(render_mode="human")
-    model = PPO.load("./train/health_gathering/best_model_1850000.zip")
+    model = PPO.load(MODEL_NAME)
     model.rollout_buffer.rewards
     
     episodes = 5
@@ -282,9 +317,27 @@ def play():
         time.sleep(2)
 
     env.close()
+
+def record():
+    env = make_env(render_mode="rgb_array")
+    model = PPO.load(MODEL_NAME)
+    
+    episodes = 5
+    for episode in range(episodes):
+        total_reward = 0
+        finished = False
+        obs, _ = env.reset()
+        while not finished:
+            action, _ = model.predict(obs)
+            obs, reward, done, truncated, info = env.step(action)
+            total_reward += reward
+            finished = done or truncated
+        print(f"Total Reward for episode {episode} is {total_reward}.")
+
+    env.close()
     
 def evaluate():
-    model = PPO.load("./train/health_gathering/best_model_1850000.zip")
+    model = PPO.load(MODEL_NAME)
     
     env = make_env()
 
@@ -301,7 +354,7 @@ def train():
     irs = RND(envs, device=device)
     callback = TrainAndLoggingCallback(irs=irs, check_freq=10000, save_path=CHECKPOINT_DIR)
     
-    model = PPO("CnnPolicy", envs, tensorboard_log=LOG_DIR, learning_rate=0.0001, n_steps=2048)
+    model = PPO("CnnPolicy", envs, tensorboard_log=LOG_DIR, learning_rate=0.0001, n_steps=4096)
     
     model.learn(total_timesteps=2000000, callback=callback, progress_bar=True)
     
@@ -325,4 +378,5 @@ if __name__ == "__main__":
     # train()
     # evaluate()
     # play()
-    play_human()
+    record()
+    # play_human()

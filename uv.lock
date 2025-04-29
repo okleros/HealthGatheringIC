@@ -1217,6 +1217,7 @@ version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "gymnasium", extra = ["other"] },
+    { name = "moviepy" },
     { name = "numpy" },
     { name = "opencv-python" },
     { name = "rllte-core" },
@@ -1228,6 +1229,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "gymnasium", extras = ["other"], specifier = "==1.0.0" },
+    { name = "moviepy", specifier = ">=2.1.2" },
     { name = "numpy", specifier = ">=2.2.4" },
     { name = "opencv-python", specifier = ">=4.11.0.86" },
     { name = "rllte-core", specifier = ">=1.0.1" },
