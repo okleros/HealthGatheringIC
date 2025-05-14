@@ -1,4 +1,5 @@
 import os
+import sys
 import time
 import torch
 
@@ -6,14 +7,14 @@ from gymnasium.wrappers import RecordVideo
 from gymnasium.utils.play import play as playing
 
 from stable_baselines3 import PPO
-from stable_baselines3.common import env_checker
 from stable_baselines3.common.env_util import make_vec_env
-from stable_baselines3.common.vec_env import SubprocVecEnv
 from stable_baselines3.common.callbacks import BaseCallback
-from stable_baselines3.common.base_class import BaseAlgorithm
 from stable_baselines3.common.evaluation import evaluate_policy
 
 from rllte.xplore.reward import RND, E3B
+
+# making the packages below visible
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from env.vizdoomenv import VizDoomGym
 from wrappers.render_wrapper import RenderWrapper
@@ -188,8 +189,8 @@ def play_human():
 
 
 if __name__ == "__main__":
-    # train()
+    train()
     # evaluate()
     # play()
     # record()
-    play_human()
+    # play_human()
