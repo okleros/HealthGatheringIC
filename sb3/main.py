@@ -82,11 +82,11 @@ class TrainAndLoggingCallback(BaseCallback):
         actions = torch.as_tensor(self.buffer.actions)
         rewards = torch.as_tensor(self.buffer.rewards)
         dones = torch.as_tensor(self.buffer.episode_starts)
-        print(obs.dtype)
-        print(new_obs.dtype)
-        print(actions.dtype)
-        print(rewards.dtype)
-        print(dones.dtype)
+        # print(obs.dtype)
+        # print(new_obs.dtype)
+        # print(actions.dtype)
+        # print(rewards.dtype)
+        # print(dones.dtype)
         # # compute the intrinsic rewards
         # intrinsic_rewards = self.irs.compute(
         #     samples=dict(observations=obs, actions=actions, 
@@ -104,10 +104,10 @@ class TrainAndLoggingCallback(BaseCallback):
 def make_env(render_mode=None):
     env = VizDoomGym(render_mode=render_mode)
     env = ImageTransformationWrapper(env, (161, 161))
-    env = GlaucomaWrapper(env, 0, 150, -100)
+    # env = GlaucomaWrapper(env, 0, 150, -100)
     
-    # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    env = IntrinsicRewardWrapper(env, RND)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    # env = IntrinsicRewardWrapper(env, RND)
     
     if render_mode == "rgb_array":
         env = RenderWrapper(env)
@@ -165,14 +165,14 @@ def evaluate():
 
 def train():
     print("Training")
-    envs = make_vec_env(make_env, n_envs=1)
+    envs = make_vec_env(make_env, n_envs=8)
     device = "cuda" if torch.cuda.is_available() else "cpu"
     irs = RND(envs, device=device)
     callback = TrainAndLoggingCallback(irs=irs, check_freq=10000, save_path=CHECKPOINT_DIR)
     
     model = PPO("CnnPolicy", envs, tensorboard_log=LOG_DIR, learning_rate=0.0001, n_steps=4096)
     
-    model.learn(total_timesteps=2000000, callback=callback, progress_bar=True)
+    model.learn(total_timesteps=2_000_000, callback=callback, progress_bar=True)
     
     envs.close()
     
