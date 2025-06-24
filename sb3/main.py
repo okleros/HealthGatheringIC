@@ -28,12 +28,13 @@ LOG_DIR = "./logs/log_health_gathering"
 # MODEL_NAME = f"./train/health_gathering_3_4096_grayscale_161x161/best_model_970000"
 # MODEL_NAME = f"./train/health_gathering_4_4096_grayscale_101x101/best_model_820000"
 # MODEL_NAME = f"./train/health_gathering_6_4096_grayscale_161x161_glaucoma50/best_model_1220000"
-MODEL_NAME = f"./train/health_gathering_7_4096_grayscale_161x161_glaucoma150/best_model_390000"
+# MODEL_NAME = f"./train/health_gathering_7_4096_grayscale_161x161_glaucoma150/best_model_390000"
 # MODEL_NAME = f"./train/health_gathering_8_4096_grayscale_161x161_glaucoma100/best_model_300000"
 # MODEL_NAME = f"./train/health_gathering_9_4096_grayscale_161x161_glaucoma200/best_model_580000"
 # MODEL_NAME = f"./train/health_gathering_10_4096_grayscale_161x161_glaucoma250/best_model_1030000"
 # MODEL_NAME = f"./train/health_gathering_11_4096_grayscale_161x161_glaucoma250_curiosity/best_model_430000"
 # MODEL_NAME = f"./train/health_gathering_12_4096_grayscale_161x161_glaucoma50_curiosity/best_model_880000"
+MODEL_NAME = CHECKPOINT_DIR + "/best_model_90000"
 
 class TrainAndLoggingCallback(BaseCallback):
 
@@ -117,6 +118,7 @@ def make_env(render_mode=None):
 def play():
     env = make_env(render_mode="human")
     model = PPO.load(MODEL_NAME)
+    # model.summary();
     
     episodes = 5
     for episode in range(episodes):
@@ -126,7 +128,7 @@ def play():
         while not finished:
             action, _ = model.predict(obs)
             obs, reward, done, truncated, info = env.step(action)
-            time.sleep(0.05)
+            # time.sleep(0.001)
             total_reward += reward
             finished = done or truncated
         print(f"Total Reward for episode {episode} is {total_reward}.")
@@ -157,7 +159,7 @@ def evaluate():
     
     env = make_env()
 
-    mean_reward, _ = evaluate_policy(model, env, n_eval_episodes=10)
+    mean_reward, _ = evaluate_policy(model, env, n_eval_episodes=50)
 
     env.close()
 
@@ -189,8 +191,16 @@ def play_human():
 
 
 if __name__ == "__main__":
-    train()
+    # train()
     # evaluate()
     # play()
     # record()
     # play_human()
+
+    print(MODEL_NAME)
+    evaluate()
+    for i in range(100000, 170000, 10000):
+        MODEL_NAME = MODEL_NAME.replace(str(i-10000), str(i))
+        print(MODEL_NAME)
+        # print("mean_reward model " + str(i) + ":")
+        evaluate()
