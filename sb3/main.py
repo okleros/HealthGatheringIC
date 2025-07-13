@@ -128,7 +128,7 @@ def play():
         while not finished:
             action, _ = model.predict(obs)
             obs, reward, done, truncated, info = env.step(action)
-            # time.sleep(0.001)
+            time.sleep(0.05)
             total_reward += reward
             finished = done or truncated
         print(f"Total Reward for episode {episode} is {total_reward}.")
