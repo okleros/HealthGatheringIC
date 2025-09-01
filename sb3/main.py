@@ -104,7 +104,7 @@ class TrainAndLoggingCallback(BaseCallback):
 
 def make_env(render_mode=None):
     env = VizDoomGym(render_mode=render_mode)
-    env = ImageTransformationWrapper(env, (161, 161))
+    env = ImageTransformationWrapper(env, (128, 128))
     # env = GlaucomaWrapper(env, 0, 150, -100)
     
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -165,19 +165,49 @@ def evaluate():
 
     print(mean_reward)
 
+# def train():
+#     print("Training")
+#     envs = make_vec_env(make_env, n_envs=8)
+#     device = "cuda" if torch.cuda.is_available() else "cpu"
+#     irs = RND(envs, device=device)
+#     callback = TrainAndLoggingCallback(irs=irs, check_freq=5000, save_path=CHECKPOINT_DIR)
+    
+#     model = PPO("CnnPolicy", envs, tensorboard_log=LOG_DIR, learning_rate=0.001, n_steps=2048)
+    
+#     model.learn(total_timesteps=2_000_000, callback=callback, progress_bar=True)
+    
+#     envs.close()
+    
+
 def train():
     print("Training")
+    # 8 parallel environments to balance CPU/GPU usage
     envs = make_vec_env(make_env, n_envs=8)
+    
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    irs = RND(envs, device=device)
-    callback = TrainAndLoggingCallback(irs=irs, check_freq=10000, save_path=CHECKPOINT_DIR)
     
-    model = PPO("CnnPolicy", envs, tensorboard_log=LOG_DIR, learning_rate=0.0001, n_steps=4096)
-    
+    # Callback just handles checkpoint saving
+    callback = TrainAndLoggingCallback(irs=None, check_freq=5000, save_path=CHECKPOINT_DIR)
+
+    # Resume from checkpoint if it exists
+    if os.path.exists(MODEL_NAME):
+        print(f"Resuming training from {MODEL_NAME}")
+        model = PPO.load(MODEL_NAME, env=envs, device=device)
+    else:
+        # Reduced n_steps to limit memory usage on integrated GPU
+        model = PPO(
+            "CnnPolicy",
+            envs,
+            tensorboard_log=LOG_DIR,
+            learning_rate=0.0001,
+            n_steps=4096,  # smaller rollout length to reduce memory per step
+            batch_size=512,  # smaller batch size for integrated GPU
+            device=device
+        )
+
     model.learn(total_timesteps=2_000_000, callback=callback, progress_bar=True)
-    
     envs.close()
-    
+
 
 def callback_playing(obs_t, obs_tp1, action, reward, terminated, truncated, info):
     # cv2.imwrite("output.png", np.moveaxis(obs_tp1, 0, -1))
@@ -191,16 +221,16 @@ def play_human():
 
 
 if __name__ == "__main__":
-    # train()
+    train()
     # evaluate()
     # play()
     # record()
     # play_human()
 
-    print(MODEL_NAME)
-    evaluate()
-    for i in range(100000, 170000, 10000):
-        MODEL_NAME = MODEL_NAME.replace(str(i-10000), str(i))
-        print(MODEL_NAME)
-        # print("mean_reward model " + str(i) + ":")
-        evaluate()
+    # print(MODEL_NAME)
+    # evaluate()
+    # for i in range(100000, 170000, 10000):
+    #     MODEL_NAME = MODEL_NAME.replace(str(i-10000), str(i))
+    #     print(MODEL_NAME)
+    #     # print("mean_reward model " + str(i) + ":")
+    #     evaluate()
