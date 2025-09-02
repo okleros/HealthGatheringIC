@@ -24,17 +24,7 @@ from wrappers.image_transformation import ImageTransformationWrapper
 
 CHECKPOINT_DIR = "./train/health_gathering"
 LOG_DIR = "./logs/log_health_gathering"
-# MODEL_NAME = f"./train/health_gathering_2_2048_grayscale_161x161/best_model_1370000"
-# MODEL_NAME = f"./train/health_gathering_3_4096_grayscale_161x161/best_model_970000"
-# MODEL_NAME = f"./train/health_gathering_4_4096_grayscale_101x101/best_model_820000"
-# MODEL_NAME = f"./train/health_gathering_6_4096_grayscale_161x161_glaucoma50/best_model_1220000"
-# MODEL_NAME = f"./train/health_gathering_7_4096_grayscale_161x161_glaucoma150/best_model_390000"
-# MODEL_NAME = f"./train/health_gathering_8_4096_grayscale_161x161_glaucoma100/best_model_300000"
-# MODEL_NAME = f"./train/health_gathering_9_4096_grayscale_161x161_glaucoma200/best_model_580000"
-# MODEL_NAME = f"./train/health_gathering_10_4096_grayscale_161x161_glaucoma250/best_model_1030000"
-# MODEL_NAME = f"./train/health_gathering_11_4096_grayscale_161x161_glaucoma250_curiosity/best_model_430000"
-# MODEL_NAME = f"./train/health_gathering_12_4096_grayscale_161x161_glaucoma50_curiosity/best_model_880000"
-MODEL_NAME = CHECKPOINT_DIR + "/best_model_90000"
+MODEL_NAME = CHECKPOINT_DIR + "/best_model_1.zip"
 
 class TrainAndLoggingCallback(BaseCallback):
 
@@ -126,13 +116,13 @@ def play():
         finished = False
         obs, _ = env.reset()
         while not finished:
-            action, _ = model.predict(obs)
+            action, _ = model.predict(obs, deterministic=True)
             obs, reward, done, truncated, info = env.step(action)
             time.sleep(0.05)
             total_reward += reward
             finished = done or truncated
         print(f"Total Reward for episode {episode} is {total_reward}.")
-        time.sleep(2)
+        time.sleep(.5)
 
     env.close()
 
@@ -154,16 +144,59 @@ def record():
 
     env.close()
     
-def evaluate():
-    model = PPO.load(MODEL_NAME)
+# def evaluate():
+#     model = PPO.load(MODEL_NAME)
     
-    env = make_env()
+#     env = make_env()
 
-    mean_reward, _ = evaluate_policy(model, env, n_eval_episodes=50)
+#     mean_reward, _ = evaluate_policy(model, env, n_eval_episodes=50)
 
-    env.close()
+#     env.close()
 
-    print(mean_reward)
+#     print(mean_reward)
+
+def evaluate_all_models(n_eval_episodes: int = 100, n_envs: int = 16):
+    model_files = [
+        f for f in os.listdir(CHECKPOINT_DIR)
+        if f.endswith(".zip")
+    ]
+
+    if not model_files:
+        print("No models found in", CHECKPOINT_DIR)
+        return None
+
+    best_model = None
+    best_reward = float("-inf")
+    best_std = None
+
+    for model_file in model_files:
+        model_path = os.path.join(CHECKPOINT_DIR, model_file)
+        print(f"Evaluating {model_path}...")
+
+        model = PPO.load(model_path)
+        eval_env = make_vec_env(make_env, n_envs=n_envs)
+
+        mean_reward, std_reward = evaluate_policy(
+            model,
+            eval_env,
+            n_eval_episodes=n_eval_episodes,
+            deterministic=True
+        )
+        eval_env.close()
+
+        print(f"{model_file} → Mean reward: {mean_reward:.2f} ± {std_reward:.2f}")
+
+        # keep track of the best one
+        if mean_reward > best_reward:
+            best_reward = mean_reward
+            best_std = std_reward
+            best_model = model_file
+
+    print("\n✅ Best model found:")
+    print(f"{best_model} → Mean reward: {best_reward:.2f} ± {best_std:.2f}")
+
+    return best_model, best_reward, best_std
+
 
 # def train():
 #     print("Training")
@@ -187,9 +220,12 @@ def train():
     device = "cuda" if torch.cuda.is_available() else "cpu"
     
     # Callback just handles checkpoint saving
-    callback = TrainAndLoggingCallback(irs=None, check_freq=5000, save_path=CHECKPOINT_DIR)
+    callback = TrainAndLoggingCallback(irs=None, check_freq=10000, save_path=CHECKPOINT_DIR)
 
     # Resume from checkpoint if it exists
+    print(MODEL_NAME)
+    print(os.path.exists(MODEL_NAME))
+
     if os.path.exists(MODEL_NAME):
         print(f"Resuming training from {MODEL_NAME}")
         model = PPO.load(MODEL_NAME, env=envs, device=device)
@@ -199,13 +235,13 @@ def train():
             "CnnPolicy",
             envs,
             tensorboard_log=LOG_DIR,
-            learning_rate=0.0001,
+            learning_rate=0.001,
             n_steps=4096,  # smaller rollout length to reduce memory per step
             batch_size=512,  # smaller batch size for integrated GPU
             device=device
         )
 
-    model.learn(total_timesteps=2_000_000, callback=callback, progress_bar=True)
+    model.learn(total_timesteps=1_000_000, callback=callback, progress_bar=True)
     envs.close()
 
 
@@ -219,18 +255,15 @@ def play_human():
     playing(env, keys_to_action={ "a": 0, "d": 1, "w": 2 }, wait_on_player=True, callback=callback_playing)
     env.close()
 
+def print_arch():
+    model = PPO.load(MODEL_NAME)
+    print(model.policy)
 
 if __name__ == "__main__":
-    train()
+    # train()
+    # evaluate_all_models()
     # evaluate()
-    # play()
+    play()
     # record()
     # play_human()
-
-    # print(MODEL_NAME)
-    # evaluate()
-    # for i in range(100000, 170000, 10000):
-    #     MODEL_NAME = MODEL_NAME.replace(str(i-10000), str(i))
-    #     print(MODEL_NAME)
-    #     # print("mean_reward model " + str(i) + ":")
-    #     evaluate()
+    # print_arch()
