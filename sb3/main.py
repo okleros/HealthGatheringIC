@@ -10,6 +10,7 @@ from stable_baselines3 import PPO
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.evaluation import evaluate_policy
+from stable_baselines3.common.vec_env import VecNormalize
 
 from rllte.xplore.reward import RND, E3B
 
@@ -24,7 +25,7 @@ from wrappers.image_transformation import ImageTransformationWrapper
 
 CHECKPOINT_DIR = "./train/health_gathering"
 LOG_DIR = "./logs/log_health_gathering"
-MODEL_NAME = CHECKPOINT_DIR + "/best_model_1.zip"
+MODEL_NAME = CHECKPOINT_DIR + "/best_model_1milhAOKKK.zip"
 
 class TrainAndLoggingCallback(BaseCallback):
 
@@ -116,7 +117,7 @@ def play():
         finished = False
         obs, _ = env.reset()
         while not finished:
-            action, _ = model.predict(obs, deterministic=True)
+            action, _ = model.predict(obs)
             obs, reward, done, truncated, info = env.step(action)
             time.sleep(0.05)
             total_reward += reward
@@ -202,7 +203,6 @@ def evaluate_all_models(n_eval_episodes: int = 100, n_envs: int = 16):
 #     print("Training")
 #     envs = make_vec_env(make_env, n_envs=8)
 #     device = "cuda" if torch.cuda.is_available() else "cpu"
-#     irs = RND(envs, device=device)
 #     callback = TrainAndLoggingCallback(irs=irs, check_freq=5000, save_path=CHECKPOINT_DIR)
     
 #     model = PPO("CnnPolicy", envs, tensorboard_log=LOG_DIR, learning_rate=0.001, n_steps=2048)
@@ -212,19 +212,22 @@ def evaluate_all_models(n_eval_episodes: int = 100, n_envs: int = 16):
 #     envs.close()
     
 
-def train():
+def train(total_timesteps: int = 2_000_000):
     print("Training")
     # 8 parallel environments to balance CPU/GPU usage
     envs = make_vec_env(make_env, n_envs=8)
+    # envs = VecNormalize(envs, norm_obs=False, norm_reward=True, gamma=0.99)
     
     device = "cuda" if torch.cuda.is_available() else "cpu"
+    # irs = RND(envs, device=device)
+    irs = None
     
     # Callback just handles checkpoint saving
-    callback = TrainAndLoggingCallback(irs=None, check_freq=10000, save_path=CHECKPOINT_DIR)
+    callback = TrainAndLoggingCallback(irs=irs, check_freq=5000, save_path=CHECKPOINT_DIR)
 
     # Resume from checkpoint if it exists
-    print(MODEL_NAME)
-    print(os.path.exists(MODEL_NAME))
+    # print(MODEL_NAME)
+    # print(os.path.exists(MODEL_NAME))
 
     if os.path.exists(MODEL_NAME):
         print(f"Resuming training from {MODEL_NAME}")
@@ -235,13 +238,15 @@ def train():
             "CnnPolicy",
             envs,
             tensorboard_log=LOG_DIR,
-            learning_rate=0.001,
+            learning_rate=0.0001,
             n_steps=4096,  # smaller rollout length to reduce memory per step
             batch_size=512,  # smaller batch size for integrated GPU
-            device=device
+            device=device,
+            verbose=1,
+            # gamma=.99
         )
 
-    model.learn(total_timesteps=1_000_000, callback=callback, progress_bar=True)
+    model.learn(total_timesteps=total_timesteps, callback=callback, progress_bar=True)
     envs.close()
 
 
@@ -260,10 +265,10 @@ def print_arch():
     print(model.policy)
 
 if __name__ == "__main__":
-    # train()
-    # evaluate_all_models()
+    train(total_timesteps = 1_000_000)
+    # evaluate_all_models(n_eval_episodes=20)
     # evaluate()
-    play()
+    # print_arch()
+    # play()
     # record()
     # play_human()
-    # print_arch()

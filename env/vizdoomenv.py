@@ -5,7 +5,7 @@ from gymnasium import Env, make
 import numpy as np
 
 class VizDoomGym(Env):
-    metadata = { "render_modes": ["human", "rgb_array"], "render_fps": 30 }
+    metadata = { "render_modes": ["human", "rgb_array"], "render_fps": 3000 }
 
     def __init__(self, render_mode=None) -> None:
         super().__init__()
