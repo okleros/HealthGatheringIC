@@ -25,7 +25,7 @@ from wrappers.image_transformation import ImageTransformationWrapper
 
 CHECKPOINT_DIR = "./train/health_gathering"
 LOG_DIR = "./logs/log_health_gathering"
-MODEL_NAME = CHECKPOINT_DIR + "/best_model_1milhAOKKK.zip"
+MODEL_NAME = CHECKPOINT_DIR + "/best_model_45000.zip"
 
 class TrainAndLoggingCallback(BaseCallback):
 
@@ -117,7 +117,7 @@ def play():
         finished = False
         obs, _ = env.reset()
         while not finished:
-            action, _ = model.predict(obs)
+            action, _ = model.predict(obs, deterministic=True)
             obs, reward, done, truncated, info = env.step(action)
             time.sleep(0.05)
             total_reward += reward
@@ -145,16 +145,23 @@ def record():
 
     env.close()
     
-# def evaluate():
-#     model = PPO.load(MODEL_NAME)
-    
-#     env = make_env()
+def evaluate(n_eval_episodes: int = 10, model_file: str = MODEL_NAME):
+    model_path = os.path.join(CHECKPOINT_DIR, model_file)
+    print(f"Evaluating {model_path}...")
 
-#     mean_reward, _ = evaluate_policy(model, env, n_eval_episodes=50)
+    model = PPO.load(model_path)
+    eval_env = make_vec_env(make_env, n_envs=8)
 
-#     env.close()
+    mean_reward, std_reward = evaluate_policy(
+        model,
+        eval_env,
+        n_eval_episodes=n_eval_episodes,
+        deterministic=True
+    )
+    eval_env.close()
 
-#     print(mean_reward)
+    print(f"{model_file} → Mean reward: {mean_reward:.2f} ± {std_reward:.2f}")
+
 
 def evaluate_all_models(n_eval_episodes: int = 100, n_envs: int = 16):
     model_files = [
@@ -265,10 +272,10 @@ def print_arch():
     print(model.policy)
 
 if __name__ == "__main__":
-    train(total_timesteps = 1_000_000)
+    # train(total_timesteps = 2_000_000)
     # evaluate_all_models(n_eval_episodes=20)
-    # evaluate()
-    # print_arch()
+    # evaluate(n_eval_episodes=500, model_file= "best_model_45000")
+    print_arch()
     # play()
     # record()
     # play_human()
